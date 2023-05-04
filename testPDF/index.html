@@ -11,7 +11,7 @@
         <label for="password">password:</label>
         <input type="text" id="password" name="password"><br/>
     </div>
-    <button type="button" onclick="extractText();">Generate</button><br/><br/>
+    <button id="generate" disabled="true" type="button" onclick="extractText();">Generate</button><br/><br/>
     <!-- a container for the output -->
     <!-- <div id="output"></div> -->
 
@@ -21,18 +21,26 @@
         PDFJS.workerSrc = '';
         function validateFile(){
             var input = document.getElementById("file-id");
-            var fReader = new FileReader();
-            fReader.readAsBinaryString(input.files[0]);
-            fReader.onloadend = function (event) {
-                PDFJS.getDocument({ data: event.target.result, password: password.value }).then(function (pdf) {
-                    // PDF loading Success
-                }, function (reason) {
-                    // PDF loading error
-                    console.log(reason);
-                    if(reason.name === 'PasswordException'){
-                        document.getElementById("passDiv").style = '';
-                    }
-                });
+            document.getElementById("passDiv").style = 'display: none;';
+            if(input.files[0].name.indexOf("[") == -1 
+            || input.files[0].name.indexOf("]") == -1){
+                alert('File name should be \'[Gcash/Maya] xxxxxxxx.pdf\'');
+                document.getElementById("generate").disabled = true;
+            }else{
+                document.getElementById("generate").disabled = false;
+                var fReader = new FileReader();
+                fReader.readAsBinaryString(input.files[0]);
+                fReader.onloadend = function (event) {
+                    PDFJS.getDocument({ data: event.target.result, password: password.value }).then(function (pdf) {
+                        // PDF loading Success
+                    }, function (reason) {
+                        // PDF loading error
+                        console.log(reason);
+                        if(reason.name === 'PasswordException'){
+                            document.getElementById("passDiv").style = '';
+                        }
+                    });
+                }
             }
         }
         function extractText() {
