@@ -111,56 +111,26 @@
             });
         }
         function downloadCSV() {
-            if(generatedTableData){
-                let downloadTableHeader='';
-                let downloadTableData = [];
-                let maxRows = 40;
-                let page = 0;
-                let pageRows = 0;
-                generatedTableData.forEach(row => {
-                    let getKeys = Object.keys(row);
-                    //console.log(getKeys);
-                    //generate table headers, this will only happen once
-                    let times = 0;
-                    if(!downloadTableHeader){
-                        getKeys.forEach(header => {
-                            downloadTableHeader += '"'+header+'",';
-                            //console.log(times,downloadTableHeader);
-                            times++
-                        });
-                        downloadTableHeader = downloadTableHeader.slice(0, - 1);
-                        downloadTableHeader += '\n'
-                        downloadTableData[page] = downloadTableHeader;
+            var getTableRows = document.getElementById('tableData').children[0].children;
+            let csvStr='';
+            for (let row of getTableRows) {
+                if(row.textContent.indexOf('Count') == -1){
+                    for (let column of row.children) {
+                        let content = (column.tagName == 'TH')?'"'+column.textContent+'",':'"'+column.firstChild.value+'",';
+                        content = content.replace(/[&\/\\#,$~%:?]/g,'');
+                        csvStr += content;
+                        csvStr = csvStr.slice(0, -1);
                     }
-                    console.log(downloadTableData);
-                    //generate table data
-                    let rowData='';
-                    getKeys.forEach(header => {
-                        rowData += '"'+row[header]+'",';
-                    });
-                    rowData = rowData.slice(0,-1);
-                    rowData += '\n'
-
-                    downloadTableData[page] = (downloadTableData[page])?downloadTableData[page]+rowData:rowData;
-
-                    if(pageRows >= maxRows){
-                        page++;
-                        pageRows = 0;
-                    }else{
-                        pageRows++;
-                    }
-                    
-                });
-                //console.log(downloadTableData);
-                if(downloadTableData[0]){
-                    let hiddenElement = document.createElement('a');
-                    hiddenElement.target = '_blank';
-                    downloadTableData.forEach(eachPage => {
-                        hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(eachPage);
-                        hiddenElement.download = 'import_bluecoins_page.csv';
-                        hiddenElement.click();
-                    });
+                    csvStr +='\n';
                 }
+            }
+
+            if(csvStr){
+                var hiddenElement = document.createElement('a');
+                hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csvStr);
+                hiddenElement.target = '_blank';
+                hiddenElement.download = 'import_bluecoins.csv';
+                hiddenElement.click();
             }
         }
         function createTable(){
