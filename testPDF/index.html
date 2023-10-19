@@ -112,45 +112,50 @@
         }
         function downloadCSV() {
             if(generatedTableData){
-                let downloadTableHeader;
+                let downloadTableHeader='';
                 let downloadTableData = [];
                 let maxRows = 40;
                 let page = 0;
                 let pageRows = 0;
                 generatedTableData.forEach(row => {
                     let getKeys = Object.keys(row);
+                    //console.log(getKeys);
                     //generate table headers, this will only happen once
-                    if(!tableHeader){
+                    let times = 0;
+                    if(!downloadTableHeader){
                         getKeys.forEach(header => {
-                            tableHeader += '"'+header+'",';
+                            downloadTableHeader += '"'+header+'",';
+                            //console.log(times,downloadTableHeader);
+                            times++
                         });
-                        tableHeader.slice(0,-1);
-                        tableHeader += '\n'
+                        downloadTableHeader = downloadTableHeader.slice(0, - 1);
+                        downloadTableHeader += '\n'
+                        downloadTableData[page] = downloadTableHeader;
                     }
-
+                    console.log(downloadTableData);
                     //generate table data
-                    let rowData;
+                    let rowData='';
                     getKeys.forEach(header => {
                         rowData += '"'+row[header]+'",';
                     });
-                    rowData.slice(0,-1);
+                    rowData = rowData.slice(0,-1);
                     rowData += '\n'
-                    
-                    if(pageRows <= maxRows){
+
+                    downloadTableData[page] = (downloadTableData[page])?downloadTableData[page]+rowData:rowData;
+
+                    if(pageRows >= maxRows){
                         page++;
                         pageRows = 0;
                     }else{
                         pageRows++;
                     }
-
-                    downloadTableData[page] = (downloadTableData[page])?downloadTableData[page]+rowData:rowData;
                     
                 });
-                
+                //console.log(downloadTableData);
                 if(downloadTableData[0]){
                     let hiddenElement = document.createElement('a');
                     hiddenElement.target = '_blank';
-                    generatedTableData.forEach(eachPage => {
+                    downloadTableData.forEach(eachPage => {
                         hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(eachPage);
                         hiddenElement.download = 'import_bluecoins_page.csv';
                         hiddenElement.click();
