@@ -117,10 +117,10 @@
                 if(row.textContent.indexOf('Count') == -1){
                     for (let column of row.children) {
                         let content = (column.tagName == 'TH')?'"'+column.textContent+'",':'"'+column.firstChild.value+'",';
-                        content = content.replace(/[&\/\\#$~%:?]/g,'');
+                        content = content.replace(/[&#$~%?]/g,'');
                         csvStr += content;
-                        csvStr = csvStr.slice(0, -1);
                     }
+                    csvStr = csvStr.slice(0, -1);
                     csvStr +='\n';
                 }
             }
@@ -154,7 +154,7 @@
                     let tableRowData = '<tr>';
                     getKeys.forEach(header => {
                         let cols = (row[header].length<3)?5:10;
-                        tableRowData += '<td><textarea row="1" cols="'+cols+'">'+row[header]+'</textarea></td>';
+                        tableRowData += '<td><textarea row="1" cols="'+cols+'">'+row[header].replace(/[&#$~%?]/g,'')+'</textarea></td>';
                     });
                     tableRowData += '</tr>';
                     tableDOM += tableRowData;
