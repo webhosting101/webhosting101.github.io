@@ -8,8 +8,7 @@
         //import {pdfjsGetDoc} from "./src/util.js"
         // Loaded via <script> tag, create shortcut to access PDF.js exports.
         var pdfjsLib = window['pdfjs-dist/build/pdf'];
-        var datass = '';
-        var DataArr = [];
+        var generatedTableData = [];
         pdfjsLib.workerSrc = '';
         function validateFile(){
             //clear out the table
@@ -112,36 +111,59 @@
             });
         }
         function downloadCSV() {
-            var getTableRows = document.getElementById('tableData').children[0].children;
-            let csvStr='';
-            for (let row of getTableRows) {
-                if(row.textContent.indexOf('Count') == -1){
-                    for (let column of row.children) {
-                        if(column.tagName == 'TH'){
-                            csvStr += '"'+column.textContent+'",';
-                        }else{
-                            csvStr += '"'+column.firstChild.value+'",';
-                        }
-                        csvStr.slice(0, -1);
+            if(generatedTableData){
+                let downloadTableHeader;
+                let downloadTableData = [];
+                let maxRows = 40;
+                let page = 0;
+                let pageRows = 0;
+                generatedTableData.forEach(row => {
+                    let getKeys = Object.keys(row);
+                    //generate table headers, this will only happen once
+                    if(!tableHeader){
+                        getKeys.forEach(header => {
+                            tableHeader += '"'+header+'",';
+                        });
+                        tableHeader.slice(0,-1);
+                        tableHeader += '\n'
                     }
-                    csvStr +='\n';
+
+                    //generate table data
+                    let rowData;
+                    getKeys.forEach(header => {
+                        rowData += '"'+row[header]+'",';
+                    });
+                    rowData.slice(0,-1);
+                    rowData += '\n'
+                    
+                    if(pageRows <= maxRows){
+                        page++;
+                        pageRows = 0;
+                    }else{
+                        pageRows++;
+                    }
+
+                    downloadTableData[page] = (downloadTableData[page])?downloadTableData[page]+rowData:rowData;
+                    
+                });
+                
+                if(downloadTableData[0]){
+                    let hiddenElement = document.createElement('a');
+                    hiddenElement.target = '_blank';
+                    generatedTableData.forEach(eachPage => {
+                        hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(eachPage);
+                        hiddenElement.download = 'import_bluecoins_page.csv';
+                        hiddenElement.click();
+                    });
                 }
             }
-
-            if(csvStr){
-                var hiddenElement = document.createElement('a');
-                hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csvStr);
-                hiddenElement.target = '_blank';
-                hiddenElement.download = 'import_bluecoins.csv';
-                hiddenElement.click();
-            }
         }
-        function createTable(tableData){
+        function createTable(){
             let downloadCSVButton = document.getElementById('csvButton');
-            if(tableData){
-                let tableDOM = '<table id="tableData"><tr><th colspan="'+Object.keys(tableData[0]).length+'">Transaction Count: '+tableData.length+'</th></tr>';
+            if(generatedTableData){
+                let tableDOM = '<table id="tableData"><tr><th colspan="'+Object.keys(generatedTableData[0]).length+'">Transaction Count: '+generatedTableData.length+'</th></tr>';
                 let tableHeader='';
-                tableData.forEach(row => {
+                generatedTableData.forEach(row => {
                     //console.log(row)
                     let getKeys = Object.keys(row);
                     //generate table headers
@@ -177,7 +199,6 @@
             let startingIndicator = ' STARTING BALANCE ';
             let endingIndicator = ' ENDING BALANCE ';
             let startingBalance = 0;
-            let tableData = [];
             for (var pageNum = 0; pageNum < pagesText.length; pageNum++) {
                 //get the year on the PDF File
                 let pdfYear = pagesText[pageNum].split('History ')[1].substring(0, 4);
@@ -238,11 +259,11 @@
                         //(12)Split logic
                         tableRow['(12)Split'] = '';
                         console.log(tableRow);
-                        tableData.push(tableRow);
+                        generatedTableData.push(tableRow);
                     }
                 }
             }
-            createTable(tableData);
+            createTable();
         }
         function bpiCCParser(pagesText) {
             console.log(pagesText); // representing every single page of PDF Document by array indexing
@@ -264,7 +285,6 @@
                 'November':'11',
                 'December':'12'
             };
-            let tableData = [];
             let hasJanuary = false;
             let hasDecember = false;
             //this will loop through the pages
@@ -378,14 +398,14 @@
                             tableRow['(12)Split'] = '';
                             console.log(tableRow);
                             if(itemPayee){
-                                tableData.push(tableRow);
+                                generatedTableData.push(tableRow);
                             }
                         }
                     }
                 }
             }
-            //console.log(tableData);
-            createTable(tableData);
+            //console.log(generatedTableData);
+            createTable();
         }
     </script>
     <style>
