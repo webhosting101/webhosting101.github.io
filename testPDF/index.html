@@ -118,9 +118,9 @@
                 if(row.textContent.indexOf('Count') == -1){
                     for (let column of row.children) {
                         if(column.tagName == 'TH'){
-                            csvStr += column.textContent+',';
+                            csvStr += '"'+column.textContent+'",';
                         }else{
-                            csvStr += column.firstChild.value+',';
+                            csvStr += '"'+column.firstChild.value+'",';
                         }
                         csvStr.slice(0, -1);
                     }
