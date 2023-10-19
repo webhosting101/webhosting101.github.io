@@ -29,6 +29,7 @@
         function extractText() {
             var input = document.getElementById("file-id");
             var password = document.getElementById("password");
+            document.getElementById("generate").disabled = true;
             pdfjsGetDoc(input,false);
         }
         function pdfjsGetDoc(input,isValidate){
