@@ -117,7 +117,7 @@
                 if(row.textContent.indexOf('Count') == -1){
                     for (let column of row.children) {
                         let content = (column.tagName == 'TH')?'"'+column.textContent+'",':'"'+column.firstChild.value+'",';
-                        content = content.replace(/[&\/\\#,$~%:?]/g,'');
+                        content = content.replace(/[&\/\\#$~%:?]/g,'');
                         csvStr += content;
                         csvStr = csvStr.slice(0, -1);
                     }
