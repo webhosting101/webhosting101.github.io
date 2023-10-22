@@ -5,243 +5,9 @@
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.entry.min.js" ></script> -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
     <script>
-        //import {pdfjsGetDoc} from "./src/util.js"
-        // Loaded via <script> tag, create shortcut to access PDF.js exports.
-        var pdfjsLib = window['pdfjs-dist/build/pdf'];
-        var generatedTableData = [];
-        pdfjsLib.workerSrc = '';
-        function validateFile(){
-            //clear out the table
-            document.getElementById('output').innerHTML = '';
-            //hide password input for initial assesment
-            document.getElementById("passDiv").style = 'display: none;';
-            //get file to process
-            var input = document.getElementById("file-id");
-            if(input.files[0].name.indexOf("[") == -1 
-            || input.files[0].name.indexOf("]") == -1){
-                alert('File name should be \'[Gcash/BPI CC] xxxxxxxx.pdf\'');
-                document.getElementById("generate").disabled = true;
-            }else{
-                document.getElementById("generate").disabled = false;
-                pdfjsGetDoc(input,true);
-            }
-        }
-        function extractText() {
-            var input = document.getElementById("file-id");
-            var password = document.getElementById("password");
-            document.getElementById("generate").disabled = true;
-            pdfjsGetDoc(input,false);
-        }
-        function pdfjsGetDoc(input,isValidate){
-            //getPassword
-            var password = document.getElementById("password");
-            //this will turn the PDF to binary to be consumed by the PDFJS lib
-            var fReader = new FileReader();
-            fReader.readAsBinaryString(input.files[0]);
-            fReader.onloadend = function (event) {
-                pdfjsLib.getDocument({ data: event.target.result, password: password.value }).promise.then(function(pdf) {
-                    // PDF loading Success
-                    //this will force an error if password is requred and not given
-                    console.log(pdf);
-                    if(isValidate){
-                        return;
-                    }
-                    // Create an array that will contain our promises
-                    var pagesPromises = [];
-
-                    for (var i = 0; i < pdf._pdfInfo.numPages; i++) {
-                        // Required to prevent that i is always the total of pages
-                        (function (pageNumber) {
-                            // Store the promise of getPageText that returns the text of a page
-                            pagesPromises.push(getPageText(pageNumber, pdf));
-                        })(i + 1);
-                    }
-
-                    // Execute all the promises
-                    Promise.all(pagesPromises).then(function (pagesText) {
-                        var documentName = input.files[0].name;
-                        var docType = documentName.substring(
-                            documentName.indexOf("[") + 1, 
-                            documentName.lastIndexOf("]")
-                        );
-                        
-                        if(docType.toLowerCase() === "gcash"){
-                            gcashParser(pagesText);
-                        }else if(docType.toLowerCase() === "maya"){
-
-                        }else if(docType.toLowerCase() === "bpi cc"){
-                            bpiCCParser(pagesText);
-                        }
-                    });
-                }, function (reason) {
-                    // PDF loading error
-                    console.log(reason);
-                    if(reason.name === 'PasswordException'){
-                        document.getElementById("passDiv").style = '';
-                    }
-                });
-            }
-        }
-        function getPageText(pageNum, PDFDocumentInstance) {
-            // Return a Promise that is solved once the text of the page is retrieven
-            return new Promise(function (resolve, reject) {
-                PDFDocumentInstance.getPage(pageNum).then(function (pdfPage) {
-                    // The main trick to obtain the text of the PDF page, use the getTextContent method
-                    pdfPage.getTextContent().then(function (textContent) {
-                        console.log(textContent.items);
-                        //textItems = object, parameters of the taken string from the PDF
-                        var textItems = textContent.items;
-                        var finalString = "";
-                        //this means that
-                        for (var i = 0; i < textItems.length; i++) {
-                            var getString = textItems[i].str;
-                            var matchWordBeforeSpace = getString.match(/([^\s]+)/g);
-                            //console.log(matchWordBeforeSpace[0]);
-                            if(matchWordBeforeSpace && matchWordBeforeSpace[0].length === 1){
-                                //this means that the word is seperated by space IE 'C U S T O M E R'
-                                finalString += textItems[i].str.replace(/\s/g, "")+' ';
-                            }else if(textItems[i].height > 0){//this will only get the whole words
-                                finalString += textItems[i].str+' ';
-                            }
-
-                        }
-                        // Solve promise with the text retrieven from the page
-                        resolve(finalString);
-                    });
-                });
-            });
-        }
-        function downloadCSV() {
-            var getTableRows = document.getElementById('tableData').children[0].children;
-            let csvStr='';
-            for (let row of getTableRows) {
-                if(row.textContent.indexOf('Count') == -1){
-                    for (let column of row.children) {
-                        let content = (column.tagName == 'TH')?'"'+column.textContent+'",':'"'+column.firstChild.value+'",';
-                        content = content.replace(/[&#$~%?]/g,'');
-                        csvStr += content;
-                    }
-                    csvStr = csvStr.slice(0, -1);
-                    csvStr +='\n';
-                }
-            }
-
-            if(csvStr){
-                var hiddenElement = document.createElement('a');
-                hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csvStr);
-                hiddenElement.target = '_blank';
-                hiddenElement.download = 'import_bluecoins.csv';
-                hiddenElement.click();
-            }
-        }
-        function createTable(){
-            let downloadCSVButton = document.getElementById('csvButton');
-            if(generatedTableData){
-                let tableDOM = '<table id="tableData"><tr><th colspan="'+Object.keys(generatedTableData[0]).length+'">Transaction Count: '+generatedTableData.length+'</th></tr>';
-                let tableHeader='';
-                generatedTableData.forEach(row => {
-                    //console.log(row)
-                    let getKeys = Object.keys(row);
-                    //generate table headers
-                    if(!tableHeader){
-                        tableHeader += '<tr>';
-                            getKeys.forEach(header => {
-                            tableHeader += '<th>'+header+'</th>';
-                        });
-                        tableHeader += '</tr>';
-                        tableDOM += tableHeader;
-                    }
-                    //generate table data
-                    let tableRowData = '<tr>';
-                    getKeys.forEach(header => {
-                        let cols = (row[header].length<3)?5:10;
-                        tableRowData += '<td><textarea row="1" cols="'+cols+'">'+row[header].replace(/[&#$~%?]/g,'')+'</textarea></td>';
-                    });
-                    tableRowData += '</tr>';
-                    tableDOM += tableRowData;
-                });
-                tableDOM += '</table>';
-                document.getElementById('output').innerHTML = tableDOM;
-                downloadCSVButton.disabled = false;
-            }else{
-                downloadCSVButton.disabled = true;
-            }
-        }
-        function gcashParser(pagesText) {
-            // Display text of all the pages in the console
-            // e.g ["Text content page 1", "Text content page 2", "Text content page 3" ... ]
-            // console.log(pagesText); // representing every single page of PDF Document by array indexing
-            //var outputStr = "";
-            let startingIndicator = ' STARTING BALANCE ';
-            let endingIndicator = ' ENDING BALANCE ';
-            let startingBalance = 0;
-            for (var pageNum = 0; pageNum < pagesText.length; pageNum++) {
-                //get the year on the PDF File
-                let pdfYear = pagesText[pageNum].split('History ')[1].substring(0, 4);
-                let perRow = pagesText[pageNum].split(' '+pdfYear+'-');//year today
-                //outputStr += "<br/><br/>Page " + (pageNum + 1) + " contents <br/> <br/>";
-                //outputStr +="(1)Type,(2)Date,(3)Item or Payee,(4)Amount,(5)Parent Category,(6)Catergory,(7)Account Type,(8)Account,(9)Notes,(10)Label,(11)Status,(12)Split";
-                for (var rowNum = 0; rowNum < perRow.length; rowNum++) {
-                    let row = perRow[rowNum];
-                    if(row.indexOf(startingIndicator) > -1){
-                        startingBalance = parseFloat(row.split(startingIndicator)[1]);
-                    }
-                    console.log(row,startingBalance);
-                    if (row.indexOf(' AM ') > -1 || row.indexOf(' PM ') > -1) {// transactions only
-                        //this will split the last row to just get the transaction
-                        if(rowNum == perRow.length-1){
-                            row = row.split(endingIndicator)[0];
-                        }
-                        let tableRow = {};
-                        let splitRow = row.split(' ');
-                        console.log(splitRow);
-                        //(1)Type
-                        let debit = parseFloat(startingBalance-parseFloat(splitRow[splitRow.length-2])).toFixed(2)==parseFloat(splitRow[splitRow.length-1]).toFixed(2);
-                        console.log(debit,parseFloat(startingBalance-parseFloat(splitRow[splitRow.length-2])).toFixed(2),parseFloat(splitRow[splitRow.length-1]).toFixed(2));
-                        if(debit){
-                            tableRow['(1)Type'] = 'e';
-                            startingBalance = startingBalance-parseFloat(splitRow[splitRow.length-2]);
-                        }else{
-                            tableRow['(1)Type'] = 'i';
-                            startingBalance = startingBalance+parseFloat(splitRow[splitRow.length-2]);
-                        }
-                        //(2)Date logic
-                        let dateSplit = splitRow[0].split('-');//MM-DD
-                        let timeSplit = splitRow[1].split(':');//HH:MM
-                        let timeIn24h = (splitRow[2] === 'AM')?splitRow[1]:(parseInt(timeSplit[0])+12)+':'+timeSplit[1];
-                        tableRow['(2)Date'] = dateSplit[0]+'/'+dateSplit[1]+'/'+pdfYear+' '+timeIn24h;
-                        //(3)Item or Payee logic
-                        let itemPayee ='';
-                        for(let wordLoc = 3; wordLoc < splitRow.length - 3; wordLoc++){ 
-                            itemPayee += splitRow[wordLoc]+' ';
-                        }
-                        tableRow['(3)Item or Payee'] = itemPayee.substring(0, itemPayee.length - 1);
-                        //(4)Amount logic
-                        tableRow['(4)Amount'] = splitRow[splitRow.length-2];
-                        //(5)Parent Category logic
-                        tableRow['(5)Parent Category'] = 'OTHERS';
-                        //(6)Category logic
-                        tableRow['(6)Category'] = 'Others';
-                        //(7)Account Type logic
-                        tableRow['(7)Account Type'] = 'VIRTUAL ACCOUNTS';
-                        //(8)Account logic
-                        tableRow['(8)Account'] = 'Gcash';
-                        //(9)Notes logic
-                        tableRow['(9)Notes'] = '';
-                        //(10)Label logic
-                        tableRow['(10)Label'] = 'Gcash';
-                        //(11)Status logic
-                        tableRow['(11)Status'] = '';
-                        //(12)Split logic
-                        tableRow['(12)Split'] = '';
-                        console.log(tableRow);
-                        generatedTableData.push(tableRow);
-                    }
-                }
-            }
-            createTable();
-        }
-        function bpiCCParser(pagesText) {
+        //this will contain the parsers to be used
+        var methodParsers = {};
+        methodParsers['BPI_CC'] = (pagesText) => {
             console.log(pagesText); // representing every single page of PDF Document by array indexing
             let enablePageText = false;
             let unbilledCount = 0;
@@ -261,12 +27,13 @@
                 'November':'11',
                 'December':'12'
             };
+            let tableData = [];
             let hasJanuary = false;
             let hasDecember = false;
             //this will loop through the pages
             for (var pageNum = 0; pageNum < pagesText.length; pageNum++) {
                 var pageContent = pagesText[pageNum];
-                console.log(pageContent);
+                //console.log(pageContent);
                 //this will determin the year if + or - 1
                 hasJanuary = (hasJanuary || (pageContent.indexOf('January') > -1));
                 hasDecember = (hasDecember || (pageContent.indexOf('December') > -1));
@@ -372,19 +139,396 @@
                             tableRow['(11)Status'] = '';
                             //(12)Split logic
                             tableRow['(12)Split'] = '';
-                            console.log(tableRow);
+                            //console.log(tableRow);
                             if(itemPayee){
-                                generatedTableData.push(tableRow);
+                                tableData.push(tableRow);
                             }
                         }
                     }
                 }
             }
-            //console.log(generatedTableData);
-            createTable();
+            //console.log(tableData);
+            createTable(tableData);
+        }
+        methodParsers['GCash'] = (pagesText) => {
+            // Display text of all the pages in the console
+            // e.g ["Text content page 1", "Text content page 2", "Text content page 3" ... ]
+            // console.log(pagesText); // representing every single page of PDF Document by array indexing
+            //var outputStr = "";
+            let startingIndicator = ' STARTING BALANCE ';
+            let endingIndicator = ' ENDING BALANCE ';
+            let startingBalance = 0;
+            let tableData = [];
+            for (var pageNum = 0; pageNum < pagesText.length; pageNum++) {
+                //get the year on the PDF File
+                let pdfYear = pagesText[pageNum].split('History ')[1].substring(0, 4);
+                let perRow = pagesText[pageNum].split(' '+pdfYear+'-');//year today
+                //outputStr += "<br/><br/>Page " + (pageNum + 1) + " contents <br/> <br/>";
+                //outputStr +="(1)Type,(2)Date,(3)Item or Payee,(4)Amount,(5)Parent Category,(6)Catergory,(7)Account Type,(8)Account,(9)Notes,(10)Label,(11)Status,(12)Split";
+                for (var rowNum = 0; rowNum < perRow.length; rowNum++) {
+                    let row = perRow[rowNum];
+                    if(row.indexOf(startingIndicator) > -1){
+                        startingBalance = parseFloat(row.split(startingIndicator)[1]);
+                    }
+                    //console.log(row,startingBalance);
+                    if (row.indexOf(' AM ') > -1 || row.indexOf(' PM ') > -1) {// transactions only
+                        //this will split the last row to just get the transaction
+                        if(rowNum == perRow.length-1){
+                            row = row.split(endingIndicator)[0];
+                        }
+                        let tableRow = {};
+                        let splitRow = row.split(' ');
+                        //console.log(splitRow);
+                        //(1)Type
+                        let debit = parseFloat(startingBalance-parseFloat(splitRow[splitRow.length-2])).toFixed(2)==parseFloat(splitRow[splitRow.length-1]).toFixed(2);
+                        console.log(debit,parseFloat(startingBalance-parseFloat(splitRow[splitRow.length-2])).toFixed(2),parseFloat(splitRow[splitRow.length-1]).toFixed(2));
+                        if(debit){
+                            tableRow['(1)Type'] = 'e';
+                            startingBalance = startingBalance-parseFloat(splitRow[splitRow.length-2]);
+                        }else{
+                            tableRow['(1)Type'] = 'i';
+                            startingBalance = startingBalance+parseFloat(splitRow[splitRow.length-2]);
+                        }
+                        //(2)Date logic
+                        let dateSplit = splitRow[0].split('-');//MM-DD
+                        let timeSplit = splitRow[1].split(':');//HH:MM
+                        let timeIn24h = (splitRow[2] === 'AM')?splitRow[1]:(parseInt(timeSplit[0])+12)+':'+timeSplit[1];
+                        tableRow['(2)Date'] = dateSplit[0]+'/'+dateSplit[1]+'/'+pdfYear+' '+timeIn24h;
+                        //(3)Item or Payee logic
+                        let itemPayee ='';
+                        for(let wordLoc = 3; wordLoc < splitRow.length - 3; wordLoc++){ 
+                            itemPayee += splitRow[wordLoc]+' ';
+                        }
+                        tableRow['(3)Item or Payee'] = itemPayee.substring(0, itemPayee.length - 1);
+                        //(4)Amount logic
+                        tableRow['(4)Amount'] = splitRow[splitRow.length-2];
+                        //(5)Parent Category logic
+                        tableRow['(5)Parent Category'] = 'OTHERS';
+                        //(6)Category logic
+                        tableRow['(6)Category'] = 'Others';
+                        //(7)Account Type logic
+                        tableRow['(7)Account Type'] = 'VIRTUAL ACCOUNTS';
+                        //(8)Account logic
+                        tableRow['(8)Account'] = 'Gcash';
+                        //(9)Notes logic
+                        tableRow['(9)Notes'] = '';
+                        //(10)Label logic
+                        tableRow['(10)Label'] = 'Gcash';
+                        //(11)Status logic
+                        tableRow['(11)Status'] = '';
+                        //(12)Split logic
+                        tableRow['(12)Split'] = '';
+                        //console.log(tableRow);
+                        tableData.push(tableRow);
+                    }
+                }
+            }
+            createTable(tableData);
+        };
+        var defaultHeaders = {
+            'Parent_Category':[],
+            'Category':[],
+            'Account_Type':[],
+            'Account':[],
+            'Label':[]
+        }
+        onload = (event) => {
+            var defaultTab = document.getElementsByClassName('tablinks');
+            defaultTab[0].click();
+            reset();
+            //============================PDF Parser Tab=======================================
+            //select will only based on available functions,generate options for the select
+            var pdfParserSelect = document.getElementById('tranType');
+            Object.keys(methodParsers).forEach(parser => {
+                var generateOptions = document.createElement('option');
+                generateOptions.textContent = parser.replace('_',' ');
+                generateOptions.value = parser;
+                pdfParserSelect.appendChild(generateOptions);
+            });
+            //============================PDF Parser Tab=======================================
+            //============================Defaults Tab=========================================
+            //generate table based on headers
+            var defaultsDiv = document.getElementById('Defaults');
+            var generateTable = document.createElement("table");
+            var generateTableBody = document.createElement("tbody");
+            var generateTableRowFirst = document.createElement("tr");
+            var generateTableRowSecond = document.createElement("tr");
+            var generateTableRowThird = document.createElement("tr");
+            Object.keys(defaultHeaders).forEach(header => {
+                //this is the table header contents
+                var tableHeader = document.createElement("th");
+                tableHeader.innerText = header.replace('_',' ');
+                generateTableRowFirst.appendChild(tableHeader);
+                //this is the 1st row contents
+                var tableDataSecond = document.createElement("td");
+                tableDataSecond.id = header;
+                var inputText = document.createElement("input");
+                inputText.type = 'text';
+                tableDataSecond.appendChild(inputText);
+                tableDataSecond.appendChild(document.createElement("br"));
+                tableDataSecond.appendChild(document.createElement("br"));
+                var buttonAdd = document.createElement("button");
+                buttonAdd.onclick = (event)=>{addElement(event)};
+                buttonAdd.textContent = 'Add Item';
+                tableDataSecond.appendChild(buttonAdd);
+                tableDataSecond.appendChild(document.createElement("br"));
+                tableDataSecond.appendChild(document.createElement("br"));
+                generateTableRowSecond.appendChild(tableDataSecond);
+                //this is the 2nd row contents
+                var tableDataSecond = document.createElement("td");
+                tableDataSecond.id = header+'_Output';
+                generateTableRowThird.appendChild(tableDataSecond);
+            });
+            //body inserting first row
+            generateTableBody.appendChild(generateTableRowFirst);
+            //body inserting second row
+            generateTableBody.appendChild(generateTableRowSecond);
+            //body inserting second row
+            generateTableBody.appendChild(generateTableRowThird);
+            //table inserting body
+            generateTable.appendChild(generateTableBody);
+            //div inserting table
+            defaultsDiv.appendChild(generateTable);
+            //============================Defaults Tab=========================================
+        };
+
+        //import {pdfjsGetDoc} from "./src/util.js"
+        // Loaded via <script> tag, create shortcut to access PDF.js exports.
+        var pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.workerSrc = '';
+        function reset(){
+            //clear out the table
+            document.getElementById('output').innerHTML = '';
+            //hide password input
+            document.getElementById("passDiv").style = 'display: none;';
+            document.getElementById("generate").disabled = true;
+            document.getElementById("csvButton").disabled = true;
+            //doesn't work in IE
+            document.getElementById("file-id").value = null;
+        }
+        function validateFile(){
+            //clear out the table
+            document.getElementById('output').innerHTML = '';
+            //hide password input for initial assesment
+            document.getElementById("passDiv").style = 'display: none;';
+            document.getElementById("generate").disabled = false;
+
+            pdfjsGetDoc(document.getElementById("file-id"),true);
+        }
+        function extractText() {
+            document.getElementById("generate").disabled = true;
+            pdfjsGetDoc(document.getElementById("file-id"),false);
+        }
+        function pdfjsGetDoc(input,isValidate){
+            //getPassword
+            var password = document.getElementById("password");
+            //this will turn the PDF to binary to be consumed by the PDFJS lib
+            var fReader = new FileReader();
+            fReader.readAsBinaryString(input.files[0]);
+            fReader.onloadend = function (event) {
+                pdfjsLib.getDocument({ data: event.target.result, password: password.value }).promise.then(function(pdf) {
+                    // PDF loading Success
+                    //this will force an error if password is requred and not given
+                    console.log(pdf);
+                    if(isValidate){
+                        return;
+                    }
+                    // Create an array that will contain our promises
+                    var pagesPromises = [];
+
+                    for (var i = 0; i < pdf._pdfInfo.numPages; i++) {
+                        // Required to prevent that i is always the total of pages
+                        (function (pageNumber) {
+                            // Store the promise of getPageText that returns the text of a page
+                            pagesPromises.push(getPageText(pageNumber, pdf));
+                        })(i + 1);
+                    }
+
+                    // Execute all the promises
+                    Promise.all(pagesPromises).then(function (pagesText) {
+                        var documentName = input.files[0].name;
+                        var docType = documentName.substring(
+                            documentName.indexOf("[") + 1, 
+                            documentName.lastIndexOf("]")
+                        );
+                        //this will dictate on what parser to use
+                        var getTransactionType = document.getElementById("tranType").value;
+                        try{
+                            methodParsers[getTransactionType](pagesText);
+                        }catch(e){
+                            console.log(e);
+                            alert('Wrong parser, doing a reset');
+                            reset();
+                        }
+                    });
+                }, function (reason) {
+                    // PDF loading error
+                    console.log(reason);
+                    if(reason.name === 'PasswordException'){
+                        document.getElementById("passDiv").style = '';
+                    }
+                });
+            }
+        }
+        function getPageText(pageNum, PDFDocumentInstance) {
+            // Return a Promise that is solved once the text of the page is retrieven
+            return new Promise(function (resolve, reject) {
+                PDFDocumentInstance.getPage(pageNum).then(function (pdfPage) {
+                    // The main trick to obtain the text of the PDF page, use the getTextContent method
+                    pdfPage.getTextContent().then(function (textContent) {
+                        //console.log(textContent.items);
+                        //textItems = object, parameters of the taken string from the PDF
+                        var textItems = textContent.items;
+                        var finalString = "";
+                        //this means that
+                        for (var i = 0; i < textItems.length; i++) {
+                            var getString = textItems[i].str;
+                            var matchWordBeforeSpace = getString.match(/([^\s]+)/g);
+                            //console.log(matchWordBeforeSpace[0]);
+                            if(matchWordBeforeSpace && matchWordBeforeSpace[0].length === 1){
+                                //this means that the word is seperated by space IE 'C U S T O M E R'
+                                finalString += textItems[i].str.replace(/\s/g, "")+' ';
+                            }else if(textItems[i].height > 0){//this will only get the whole words
+                                finalString += textItems[i].str+' ';
+                            }
+
+                        }
+                        // Solve promise with the text retrieven from the page
+                        resolve(finalString);
+                    });
+                });
+            });
+        }
+        function downloadCSV() {
+            var getTableRows = document.getElementById('tableData').children[0].children;
+            let csvStr='';
+            for (let row of getTableRows) {
+                if(row.textContent.indexOf('Count') == -1){
+                    for (let column of row.children) {
+                        let content = (column.tagName == 'TH')?'"'+column.textContent+'",':'"'+column.firstChild.value+'",';
+                        content = content.replace(/[&#$~%?]/g,'');
+                        csvStr += content;
+                    }
+                    csvStr = csvStr.slice(0, -1);
+                    csvStr +='\n';
+                }
+            }
+
+            if(csvStr){
+                var hiddenElement = document.createElement('a');
+                hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csvStr);
+                hiddenElement.target = '_blank';
+                hiddenElement.download = 'import_bluecoins.csv';
+                hiddenElement.click();
+            }
+        }
+        function createTable(tableData){
+            let downloadCSVButton = document.getElementById('csvButton');
+            if(tableData){
+                let tableDOM = '<table id="tableData"><tr><th colspan="'+Object.keys(tableData[0]).length+'">Transaction Count: '+tableData.length+'</th></tr>';
+                let tableHeader='';
+                tableData.forEach(row => {
+                    //console.log(row)
+                    let getKeys = Object.keys(row);
+                    //generate table headers
+                    if(!tableHeader){
+                        tableHeader += '<tr>';
+                            getKeys.forEach(header => {
+                            tableHeader += '<th>'+header+'</th>';
+                        });
+                        tableHeader += '</tr>';
+                        tableDOM += tableHeader;
+                    }
+                    //generate table data
+                    let tableRowData = '<tr>';
+                    getKeys.forEach(header => {
+                        let cols = (row[header].length<3)?5:10;
+                        tableRowData += '<td><textarea row="1" cols="'+cols+'">'+row[header].replace(/[&#$~%?]/g,'')+'</textarea></td>';
+                    });
+                    tableRowData += '</tr>';
+                    tableDOM += tableRowData;
+                });
+                tableDOM += '</table>';
+                document.getElementById('output').innerHTML = tableDOM;
+                downloadCSVButton.disabled = false;
+            }else{
+                downloadCSVButton.disabled = true;
+            }
+        }
+        function openCity(evt) {
+            var i, tabcontent, tablinks;
+            //remove all display tabs
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            //remove all active buttons
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            //set the current tab and button active
+            var button = evt.currentTarget;
+            document.getElementById(button.textContent.replace(" ","_")).style.display = "block";
+            button.className += " active";
+        }
+        function addElement(event){
+            var button = event.currentTarget;
+            var parentElem = button.parentElement;
+            console.log(parentElem.children[0].value);
+
+            var itemList = defaultHeaders[parentElem.id];
+            itemList.push(parentElem.children[0].value);
+
+            var listDOM = '<ul>';
+            itemList.forEach(item => {
+                listDOM += '<li>'+item+'</li>';
+            });
+            listDOM += '</ul>';
+
+            var outputList = document.getElementById(parentElem.id+'_Output');
+            outputList.innerHTML = listDOM;
         }
     </script>
     <style>
+        body {font-family: Arial;}
+
+        /* Style the tab */
+        .tab {
+        overflow: hidden;
+        border: 1px solid #ccc;
+        background-color: #f1f1f1;
+        }
+
+        /* Style the buttons inside the tab */
+        .tab button {
+        background-color: inherit;
+        float: left;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 14px 16px;
+        transition: 0.3s;
+        font-size: 17px;
+        }
+
+        /* Change background color of buttons on hover */
+        .tab button:hover {
+        background-color: #ddd;
+        }
+
+        /* Create an active/current tablink class */
+        .tab button.active {
+        background-color: #ccc;
+        }
+
+        /* Style the tab content */
+        .tabcontent {
+        display: none;
+        padding: 6px 12px;
+        border: 1px solid #ccc;
+        border-top: none;
+        }
         table {
             font-family: arial, sans-serif;
             border-collapse: collapse;
@@ -396,17 +540,40 @@
             padding: 8px;
         }
     </style>
-    <input type="file" id="file-id" name="file_name" onchange="validateFile()">
-    <br/>
-    <br/>
-    <div id="passDiv" style="display: none;">
-        <label for="password">password:</label>
-        <input type="text" id="password" name="password"><br/>
+    <div class="tab">
+        <button class="tablinks" onclick="openCity(event)">Pdf Parser</button>
+        <button class="tablinks" disabled onclick="openCity(event)">Rules</button>
+        <button class="tablinks" disabled onclick="openCity(event)">Defaults</button>
     </div>
-    <button id="generate" disabled="true" type="button" onclick="extractText();">Generate</button>
-    <button id="csvButton" disabled="true" type="button" onclick="downloadCSV();">Download CSV</button><br/><br/>
-    <!-- a container for the output -->
-    <div id="output"></div>
+    
+    <div id="Pdf_Parser" class="tabcontent">
+        <input type="file" id="file-id" name="file_name" onchange="validateFile()">
+        <select id="tranType"></select>
+        <br/>
+        <br/>
+        <div id="passDiv" style="display: none;">
+            <label for="password">password:</label>
+            <input type="text" id="password" name="password"><br/>
+        </div>
+        <button id="generate" disabled="true" type="button" onclick="extractText();">Generate</button>
+        <button id="csvButton" disabled="true" type="button" onclick="downloadCSV();">Download CSV</button><br/><br/>
+        <!-- a container for the output -->
+        <div id="output"></div>
+    </div>
+        
+    <div id="Rules" class="tabcontent">
+        <h3>Paris</h3>
+        <p>Paris is the capital of France.</p> 
+    </div>
+
+    <div id="Defaults" class="tabcontent">
+        <select name="cars" id="cars">
+            <option value="volvo">Volvo</option>
+            <option value="saab">Saab</option>
+            <option value="mercedes">Mercedes</option>
+            <option value="audi">Audi</option>
+        </select>
+    </div>
 </body>
 
 </html>
