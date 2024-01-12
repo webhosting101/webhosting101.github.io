@@ -1,9 +1,10 @@
 <html>
 <body>
-
+    <link rel="stylesheet" href="./styles/index.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.entry.min.js" ></script> -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+    <script src="./src/foodUtil.js"></script>
     <script>
         //this will contain the parsers to be used
         var methodParsers = {};
@@ -455,7 +456,7 @@
                 downloadCSVButton.disabled = true;
             }
         }
-        function openCity(evt) {
+        function openTab(evt) {
             var i, tabcontent, tablinks;
             //remove all display tabs
             tabcontent = document.getElementsByClassName("tabcontent");
@@ -490,63 +491,18 @@
             outputList.innerHTML = listDOM;
         }
     </script>
-    <style>
-        body {font-family: Arial;}
-
-        /* Style the tab */
-        .tab {
-        overflow: hidden;
-        border: 1px solid #ccc;
-        background-color: #f1f1f1;
-        }
-
-        /* Style the buttons inside the tab */
-        .tab button {
-        background-color: inherit;
-        float: left;
-        border: none;
-        outline: none;
-        cursor: pointer;
-        padding: 14px 16px;
-        transition: 0.3s;
-        font-size: 17px;
-        }
-
-        /* Change background color of buttons on hover */
-        .tab button:hover {
-        background-color: #ddd;
-        }
-
-        /* Create an active/current tablink class */
-        .tab button.active {
-        background-color: #ccc;
-        }
-
-        /* Style the tab content */
-        .tabcontent {
-        display: none;
-        padding: 6px 12px;
-        border: 1px solid #ccc;
-        border-top: none;
-        }
-        table {
-            font-family: arial, sans-serif;
-            border-collapse: collapse;
-            width: 50%;
-        }
-        td, th {
-            border: 1px solid #dddddd;
-            text-align: left;
-            padding: 8px;
-        }
-    </style>
     <div class="tab">
-        <button class="tablinks" onclick="openCity(event)">Pdf Parser</button>
-        <button class="tablinks" disabled onclick="openCity(event)">Rules</button>
-        <button class="tablinks" disabled onclick="openCity(event)">Defaults</button>
+        <button class="tablinks" onclick="openTab(event)">PDF Transaction</button>
+        <button class="tablinks" onclick="openTab(event)">Weekly Food</button>
     </div>
     
-    <div id="Pdf_Parser" class="tabcontent">
+    <div id="PDF_Transaction" class="tabcontent">
+        <div class="tab">
+            <button class="tablinks" disabled onclick="openTab(event)">Converter</button>
+            <button class="tablinks" disabled onclick="openTab(event)">Rules</button>
+            <button class="tablinks" disabled onclick="openTab(event)">Defaults</button>
+        </div>
+        <br/>
         <input type="file" id="file-id" name="file_name" onchange="validateFile()">
         <select id="tranType"></select>
         <br/>
@@ -573,6 +529,34 @@
             <option value="mercedes">Mercedes</option>
             <option value="audi">Audi</option>
         </select>
+    </div>
+
+    <div id="Weekly_Food" class="tabcontent">
+        <br/>
+        <input type="file" id="food_file_id" onchange="validateFile()">
+        <br/>
+        <br/>
+        <label for="daysInWeek">How many days for the week?</label>
+        <input type="text" id="daysInWeek"><br/>
+        <label >Contents Per Day:</label><br/>
+        <table>
+            <tr>
+                <th>
+                    <label for="major">Major(IE. Pork/Beef/Fish/Chicken)</label>
+                    <input type="text" id="major">
+                </th>
+                <th>
+                    <label for="minor">Minor(IE. Vegetable)</label>
+                    <input type="text" id="minor">
+                </th>
+            </tr>
+        </table>
+        <br/>
+        <br/>
+
+        <button id="generateMeals" type="button" onclick="generateMeals();">Generate</button><br/><br/>
+        <!-- a container for the output -->
+        <div id="output"></div>
     </div>
 </body>
 
