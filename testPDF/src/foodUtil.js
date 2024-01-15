@@ -8,9 +8,9 @@ generateMeals = () => {
 
     var eachCSVLine = contents.split('\n');
     var csvtoJSONFile = [];
-    var headers = eachCSVLine[0].split(',');
+    var headers = eachCSVLine[0].replace(/['"]+/g, '').split(',');
     for(var i = 1; i < eachCSVLine.length; i++) {
-        var data = eachCSVLine[i].split(',');
+        var data = eachCSVLine[i].replace(/['"]+/g, '').split(',');
         var obj = {};
         for(var j = 0; j < data.length; j++) {
             obj[headers[j].trim()] = data[j].trim();
